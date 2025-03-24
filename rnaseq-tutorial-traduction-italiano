@@ -1,0 +1,133 @@
+# La pipeline nf-core/rnaseq
+
+Per effettuare un'analisi RNA-Seq utilizzeremo la pipeline nf-core [rnaseq](https://nf-co.re/rnaseq/3.14.0).
+
+## Panoramica
+
+La pipeline è organizzata seguendo i diversi blocchi mostrati di seguito: pre-elaborazione, allineamento tradizionale (o allineamento leggero) e quantificazione, post-elaborazione e QC finale.
+
+<figure markdown="span">
+![metromap](./img/nf-core-rnaseq_metro_map_grey.png){ width="1000"}
+</figure>
+
+In ogni processo, gli utenti possono scegliere tra una gamma di opzioni diverse. È importante sottolineare che gli utenti possono decidere di seguire uno dei due diversi percorsi nella fase di allineamento e quantificazione:
+
+- allineamento tradizionale e quantificazione (fase 2);
+
+- allineamento leggero e quantificazione (fase 3).
+
+## Progettazione sperimentale
+
+Il numero di letture e il numero di repliche biologiche sono due fattori critici che i ricercatori devono considerare attentamente durante la progettazione di un esperimento RNA-seq. Sebbene possa sembrare intuitivo che avere un gran numero di letture sia sempre auspicabile, un numero eccessivo può comportare costi inutili e oneri computazionali, senza apportare miglioramenti significativi. Invece, è spesso più vantaggioso dare priorità al numero di repliche biologiche, poiché consente di catturare la variazione biologica naturale dei dati. Le repliche biologiche comportano la raccolta e il sequenziamento dell'RNA da campioni biologici distinti (ad esempio, individui, tessuti o punti temporali diversi), aiutando a rilevare cambiamenti genuini nell'espressione genica.
+
+!!! Attenzione
+
+Questo concetto non deve essere confuso con le repliche tecniche che valutano la variabilità tecnica della piattaforma di sequenziamento sequenziando lo stesso campione di RNA più volte.
+
+Per ottenere risultati ottimali, è fondamentale bilanciare il numero di repliche biologiche e la profondità di sequenziamento. Mentre l'aumento della profondità del sequenziamento migliora la capacità di rilevare geni con bassi livelli di espressione, esiste un plateau oltre il quale non si ottengono ulteriori benefici. I calcoli della potenza statistica possono informare la progettazione sperimentale stimando il numero ottimale di letture e repliche richieste. Ad esempio, questo approccio aiuta a stabilire una soglia di variazione di log2 adatta per l'analisi DE. Incorporando più repliche biologiche nella progettazione e ottimizzando la profondità del sequenziamento, i ricercatori possono migliorare la potenza statistica dell'analisi, riducendo il numero di risultati falsi positivi e aumentando l'affidabilità dei risultati.
+
+## Progettazione della libreria
+
+La progettazione della libreria RNA-seq comporta decisioni importanti, in particolare la scelta tra sequenziamento paired-end e single-end. Il sequenziamento paired-end offre approfondimenti sulle variazioni strutturali e sugli isoformi di trascrizione, migliorando significativamente l'accuratezza della mappatura per trascrizioni più lunghe e regioni ripetitive. Al contrario, il sequenziamento single-end, in cui viene sequenziata solo un'estremità del frammento, può essere un'opzione più conveniente, pur fornendo dati di alta qualità per l'analisi dell'espressione genica. La scelta tra questi due metodi dipende in ultima analisi dalla domanda di ricerca e dagli obiettivi sperimentali. Il sequenziamento paired-end è ideale per identificare nuovi trascritti o caratterizzare isoformi, mentre il sequenziamento single-end è spesso sufficiente per quantificare l'espressione genica. Fattori come il tipo di RNA (ad esempio, mRNA o RNA totale), la lunghezza della lettura, il budget e le risorse computazionali disponibili influenzano anche questa decisione.
+
+## Genoma di riferimento
+
+Le pipeline nf-core utilizzano la raccolta Illumina iGenomes come [genomi di riferimento](https://nf-co.re/docs/usage/reference_genomes).
+
+Prima di iniziare l'analisi, gli utenti potrebbero voler controllare se il genoma di cui hanno bisogno fa parte di questa raccolta. Potrebbero anche voler prendere in considerazione di scaricare il riferimento localmente, quando si esegue in locale: questo potrebbe essere utile per più esecuzioni e per velocizzare l'analisi. In questo caso, il parametro `--igenomes_base` potrebbe essere utilizzato per passare la directory radice dei riferimenti scaricati.
+
+Potrebbe anche essere necessario utilizzare file personalizzati: in questo caso gli utenti potrebbero fornire parametri specifici sulla riga di comando (opzione `--fasta` seguita dal genoma di scelta) o creare un file di configurazione aggiungendo una nuova sezione all'oggetto `genome`. Vedere [qui](https://nf-co.re/docs/usage/reference_genomes#custom-genomes) per maggiori dettagli.
+
+In questo tutorial modificheremo il file di configurazione, poiché i dati che utilizzeremo sono stati simulati sul cromosoma 21 del riferimento Human GRCh38 e abbiamo preparato il genome fasta e il genome index contenenti solo questo cromosoma localmente.
+
+I due file sono rispettivamente `/workspace/gitpod/training/data/refs/Homo_sapiens_assembly38_chr21.fa` e `/workspace/gitpod/training/data/refs/Homo_sapiens_assembly38_chr21.fa.fai`.
+
+## Annotazione di riferimento
+
+L'annotazione di riferimento svolge un ruolo cruciale nell'analisi RNA-seq. Senza un'annotazione di riferimento di alta qualità, l'analisi RNA-seq produrrebbe risultati imprecisi o incompleti. L'annotazione di riferimento fornisce una guida precisa per allineare le letture di sequenziamento a regioni genomiche specifiche, consentendo di identificare geni, trascrizioni ed elementi regolatori, nonché nuove trascrizioni ed eventi di splicing alternativi.
+
+Le pipeline nf-core utilizzano la raccolta Illumina iGenomes anche come [annotazione di riferimento](https://nf-co.re/docs/usage/reference_genomes).
+Le annotazioni di riferimento sono ampiamente obsolete rispetto alle annotazioni correnti e mancano di alcune funzionalità. Quindi, la raccomandazione generale è di scaricare una versione di annotazione più recente compatibile con il genoma. Un utente può utilizzare le opzioni `--gtf` o `--gff` per specificare i file di annotazione di scelta, oppure creare un file di configurazione aggiungendo una nuova sezione all'oggetto `genome`.
+
+Analogamente all'approccio utilizzato per il genoma, in questo tutorial modificheremo il file di configurazione. I file di annotazione includono solo le trascrizioni annotate sul cromosoma 21 del genoma di riferimento Human GRCh38 e abbiamo già preparato questi file localmente.
+
+I due file sono rispettivamente `/workspace/gitpod/training/data/refs/gencode_v29_chr21.gff` e `/workspace/gitpod/training/data/refs/gencode_v29_transcripts_chr21.fa`.
+
+## File di input
+
+I dati di input devono essere forniti in un file CSV, in base a un formato ampiamente comune per le pipeline nf-core.
+Il formato è descritto nella [pagina di utilizzo di rnaseq](https://nf-co.re/rnaseq/3.14.0/docs/usage).
+
+Il file di input è `/workspace/gitpod/training/data/reads/rnaseq_samplesheet.csv`.
+
+## Esecuzione di nf-core/rnaseq
+
+Nelle sezioni seguenti:
+
+- prepareremo i nostri riferimenti;
+
+- imposteremo le nostre risorse di calcolo per poter eseguire la pipeline su una VM gitpod;
+
+- modificheremo le impostazioni opzionali;
+
+- eseguiremo la pipeline.
+
+## File di riferimento e annotazione
+
+Seguendo le considerazioni di cui sopra, prima di tutto modificheremo il file `nextflow.config` nella nostra directory di lavoro per aggiungere un nuovo genoma.
+È sufficiente aggiungere il seguente codice alla direttiva `parameters` nella configurazione.
+
+"fantastico".
+igenomes_base = '/workspace/gitpod/training/data/refs/'
+genomi {
+ 'GRCh38chr21' {
+ fasta = "${params.igenomes_base}/sequence/Homo_sapiens_assembly38_chr21.fasta"
+ fasta_fai = "${params.igenomes_base}/sequence/Homo_sapiens_assembly38_chr21.fasta.fai"
+ gff = "${params.igenomes_base}/gencode_v29_chr21_parsed.gff"
+ transcript_fasta = "${params.igenomes_base}/gencode.v29.transcripts_chr21.fa"
+ indice_stella = "${params.igenomes_base}/star_index_chr21.tar.gz"
+salmon_index = "${params.igenomes_base}/salmon_index_chr21.tar.gz"
+}
+}
+```
+
+Per velocizzare l'analisi, includeremo `star_index` e `salmon_index` nella configurazione. Questi file sono già stati creati localmente.
+
+## Risorse di elaborazione
+
+In base alle scelte fatte all'avvio dell'ambiente gitpod, consigliamo di utilizzare i seguenti parametri aggiuntivi.
+Possono anche essere aggiunti alla direttiva dei parametri nel file di configurazione che abbiamo appena modificato.
+
+```groovy
+params {
+max_cpus = 2
+max_memory = '6.5GB'
+max_time = '2.h'
+}
+```
+## Avvio della pipeline
+
+Ora siamo pronti per avviare la pipeline e possiamo usare la seguente riga di comando:
+
+```bash
+nextflow run nf-core/rnaseq -r 3.12.0 \
+--input /workspace/gitpod/training/data/reads/rnaseq_samplesheet.csv \
+--outdir ./results_star_salmon \
+--genome GRCh38chr21 \
+--aligner star_salmon \
+--pseudo_aligner salmon \
+--skip_biotype_qc \
+--skip_stringtie \
+--skip_bigwig \
+--skip_umi_extract \
+--skip_trimming \
+--skip_fastqc \
+--skip_markduplicates \
+--skip_dupradar \
+--skip_rseqc \
+--salta_qualimap
+```
+Si noti che eseguiremo la pipeline con STAR come allineatore e Salmon in modalità basata sull'allineamento per quantificare l'espressione genica. Eseguiremo inoltre la pipeline con Salmon in modalità quasi-mapping per eseguire un allineamento e una quantificazione leggeri.
+
+I parametri `skip` sono stati inseriti per ridurre il tempo di esecuzione.
+
