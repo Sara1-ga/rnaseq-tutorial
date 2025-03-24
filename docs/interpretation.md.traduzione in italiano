@@ -1,0 +1,83 @@
+# Interpretazione
+
+Una volta identificati i geni DE, il passo cruciale successivo è interpretare i risultati. Ciò comporta l'ispezione di tabelle e grafici generati durante l'analisi per comprendere il significato biologico dei dati. In questa parte del tutorial, esploreremo i risultati discutendo i geni DE significativi ed esamineremo vari grafici generati durante l'analisi.
+
+!!! nota
+
+    I risultati illustrati in questa sezione potrebbero mostrare leggere variazioni rispetto alle tue esecuzioni a causa della casualità nell'algoritmo STAR. Questa casualità deriva dall'utilizzo di valori di seed variabili e dall'elaborazione parallela, che porta a piccole differenze nei risultati tra esecuzioni sugli stessi dati. Queste piccole discrepanze non sono biologicamente significative e possono influenzare i conteggi e i grafici successivi (come PCA e grafici di conteggio). Tuttavia, i modelli generali e i risultati principali dovrebbero rimanere coerenti. Mentre la riproducibilità esatta è l'ideale, piccole variazioni sono accettabili nella pratica, purché non influiscano sulle conclusioni principali dello studio.
+
+
+## Grafici di controllo qualità
+
+Il primo grafico che esamineremo è il grafico dell'analisi delle componenti principali (PCA). Poiché stiamo lavorando con dati simulati, i nostri metadati sono relativamente semplici, costituiti da sole tre variabili: `campione`, `condizione` e `replica`. In un tipico esperimento di RNA-seq, tuttavia, i metadati possono essere complessi e comprendere un'ampia gamma di variabili che potrebbero contribuire alla variazione del campione, come sesso, età e stadio di sviluppo.
+
+<figure markdown="span">
+  ![pca](./img/pca_plot.png){ width="400" }
+</figure>
+
+Tracciando il PCA sugli assi PC1 e PC2, usando `condizione` come variabile principale di interesse, possiamo identificare rapidamente la fonte primaria di variazione nei nostri dati. Tenendo conto di questa variazione nel nostro modello di progettazione, dovremmo essere in grado di rilevare più geni espressi in modo differenziale correlati a `condizione`. Quando si lavora con dati reali, è spesso utile tracciare i dati usando variabili diverse per esplorare quanta variazione è spiegata dai primi due PC. A seconda dei risultati, potrebbe essere informativo esaminare la variazione su assi PC aggiuntivi, come PC3 e PC4, per ottenere una comprensione più completa dei dati.
+
+Successivamente, esamineremo il grafico di clustering gerarchico per esplorare le relazioni tra i campioni in base ai loro profili di espressione genica. La mappa di calore è organizzata in modo tale che i campioni con profili di espressione simili siano vicini tra loro, consentendoci di identificare modelli nei dati.
+
+<figure markdown="span">
+  ![cluster](./img/hierarchical_clustering.png){ width="400" }
+</figure>
+
+Ricorda che per creare questo grafico abbiamo utilizzato la funzione `dist()`, quindi nella legenda a destra, un valore di 0 corrisponde a un'elevata correlazione, mentre un valore di 5 corrisponde a una correlazione molto bassa. Similmente alla PCA, possiamo vedere che i campioni tendono a raggrupparsi insieme in base alla `condizione`, in effetti possiamo osservare un alto grado di correlazione tra i tre campioni di controllo e tra i tre campioni trattati.
+
+Nel complesso, l'integrazione di questi grafici suggerisce che stiamo lavorando con dati di alta qualità e possiamo procedere con sicurezza all'analisi dell'espressione differenziale.
+
+## Risultati dell'espressione differenziale
+
+In questa parte del tutorial, esamineremo i grafici generati dopo l'analisi dell'espressione differenziale. Questi grafici non sono grafici di controllo qualità, ma piuttosto grafici che ci aiutano a interpretare i risultati. Dopo aver eseguito la funzione `results()`, un buon modo per iniziare ad avere un'idea dei risultati è guardare il grafico MA.
+<figure markdown="span">
+  ![ma_plot](./img/MA_plot.png){ width="500" }
+</figure>
+
+Per impostazione predefinita, i geni sono colorati in blu se il padj è inferiore a 0,1 e il log2 fold change è maggiore o minore di 0. I geni che si trovano al di fuori della regione di tracciamento sono rappresentati come triangoli aperti. In questa fase, non abbiamo ancora applicato un filtro per selezionare solo i geni DE significativi, che definiamo come quelli con un valore padj inferiore a 0,05 e un log2 fold change di almeno 1 o -1.
+After filtering our genes of interest according to our threshold, let's have a look to our significatnt genes:
+
+```tsv
+gene                baseMean        log2FoldChange     lfcSE          stat            pvalue              padj
+ENSG00000205726     121425.1998     2.897479           0.1515387      18.799694       7.595298e-79        1.777299e-76
+ENSG00000142192     50927.0995      3.023220           0.1891258      15.888480       7.615069e-57        8.909631e-55
+ENSG00000142156     20736.4845      2.974452           0.2159277      13.855016       1.186288e-43        9.253051e-42
+ENSG00000159231     457.7498        -1.198950          0.3058100      -3.934544       8.335457e-05        4.876242e-03
+ENSG00000156282     480.4678        1.091362           0.2969594      3.6749156       2.379280e-04        1.113503e-02
+```
+
+Per ottenere una panoramica completa del profilo trascrizionale, il grafico a vulcano rappresenta uno strumento altamente informativo.
+<figure markdown="span">
+  ![volcano_plot](./img/volcanoplot.png){ width="400"}
+</figure>
+
+Il trattamento ha indotto un'espressione differenziale in cinque geni: uno downregulated e quattro upregulated. Questo grafico rappresenta visivamente i risultati numerici riportati nella tabella sopra.
+
+Dopo l'identificazione dei geni DE, è informativo visualizzare l'espressione di specifici geni di interesse. La funzione `plotCounts()` applicata direttamente all'oggetto `dds` ci consente di esaminare i profili di espressione genica individuali senza accedere all'oggetto `res` completo.
+
+<figure markdown="span">
+  ![counts](./img/plotCounts.png){ width="400" }
+</figure>
+
+Nel nostro esempio, dopo il trattamento, osserviamo un aumento significativo nell'espressione del gene *ENSG00000142192*, evidenziando la sua reattività alle condizioni sperimentali.
+
+Infine, possiamo creare una mappa di calore utilizzando i conteggi di espressione normalizzati dei geni DE. La mappa di calore risultante visualizza come varia l'espressione di geni significativi nei campioni. Ogni riga rappresenta un gene e ogni colonna rappresenta un campione. L'intensità del colore nella mappa di calore riflette i livelli di espressione normalizzati: i colori rossi indicano un'espressione più elevata, mentre i colori blu indicano un'espressione più bassa.
+
+<figure markdown="span">
+  ![heatmap](./img/heatmap_de_genes.png){ width="400" }
+</figure>
+
+Esaminando la mappa di calore, possiamo identificare visivamente i pattern di espressione dei nostri cinque geni significativi differenzialmente espressi. Questa visualizzazione ci consente di identificare come questi geni rispondono al trattamento. La mappa di calore fornisce un modo chiaro e intuitivo per esplorare le dinamiche di espressione genica.
+
+## Analisi della sovrarappresentazione (ORA)
+
+Infine, possiamo tentare di assegnare un significato biologico ai nostri geni differenzialmente espressi tramite **Over Representation Analysis (ORA)**. L'analisi ORA identifica specifici percorsi biologici, funzioni molecolari e processi cellulari, secondo il database **Gene Ontology (GO)**, che sono arricchiti nei nostri geni differenzialmente espressi.
+
+<figure markdown="span">
+  ![enrichment](./img/enrichment_plot.png){ width="400" }
+</figure>
+
+L'analisi di arricchimento rivela un possibile coinvolgimento di strutture e processi cellulari, tra cui "cavità rivestita di clatrina", "spina dendritica", "spina neuronale" e "lume del reticolo endoplasmatico". Questi termini suggeriscono un focus sul trasporto cellulare, l'integrità strutturale e l'elaborazione delle proteine, specialmente in contesti neurali. Questo schema indica percorsi correlati all'organizzazione e al mantenimento cellulare, che potrebbero svolgere un ruolo importante nella condizione biologica in studio.
+
+## Conclusioni
+In questo tutorial, abbiamo esaminato i passaggi dell'analisi RNA-seq, dall'avvio della pipeline nfcore/rnaseq all'interpretazione dei risultati dell'espressione differenziale. Hai imparato come vengono generati i dati, hai identificato i geni espressi in modo differenziale e hai condotto l'analisi di arricchimento. Seguendo questo tutorial, dovresti ora essere in grado di utilizzare la pipeline nfcore/rnaseq ed eseguire l'analisi dell'espressione differenziale con DESeq2, interpretando i risultati nel contesto della tua ricerca.
